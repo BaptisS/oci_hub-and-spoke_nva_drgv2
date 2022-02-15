@@ -3,7 +3,7 @@
 export compocid="ocid1.compartment.oc1..axxxx"
 export vcncidrs='["172.16.100.0/24"]'
 export subnet1cidr="172.16.100.0/27"
-export vcndisplayname="TEST_SHARED_VCN"
+export vcndisplayname="SHARED_VCN"
 export dnslabel="sharedvcn"
 export subnetname="Public_Subnet_1"
 export drgattachname="DRG_ATTACH_SHARED_VCN"
@@ -103,7 +103,7 @@ oci network drg update --drg-id $drgocid --default-drg-route-tables '{"vcn":"'$d
 #SPOKE VCN 1 
 export sp1vcncidrs='["172.16.101.0/24"]'
 export sp1subnet1cidr="172.16.101.0/27"
-export sp1vcndisplayname="TEST_SPOKE_VCN_1"
+export sp1vcndisplayname="SPOKE_VCN_1"
 export sp1dnslabel="spokevcn1"
 export sp1drgattachname="DRG_ATTACH_SPOKE_VCN_1"
 
@@ -131,7 +131,7 @@ export sp1drgattachocid=$(echo $sp1drgattach | jq -r .data.id)
  
 export sp2vcncidrs='["172.16.102.0/24"]'
 export sp2subnet1cidr="172.16.102.0/27"
-export sp2vcndisplayname="TEST_SPOKE_VCN_2"
+export sp2vcndisplayname="SPOKE_VCN_2"
 export sp2dnslabel="spokevcn2"
 export sp2drgattachname="DRG_ATTACH_SPOKE_VCN_2"
 
