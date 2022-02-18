@@ -1,51 +1,54 @@
 #!/bin/sh
 
 export compocid="ocid1.compartment.oc1..axxxx"
-export vcncidrs='["172.16.100.0/24"]'
-export subnet1cidr="172.16.100.0/27"
-export vcndisplayname="SHARED_VCN"
-export dnslabel="sharedvcn"
-export subnetname="Public_Subnet_1"
-export drgattachname="DRG_ATTACH_SHARED_VCN"
-export drgname="HUB_DRG"
-export drgsharedrdname="DRG_RD_SHARED_VCN"
-export drgsharedrtname="DRG_RT_SHARED_VCN"
-#export drgsharedrdstats='[{"action":"ACCEPT","matchCriteria":[{"attachmentType":"VCN","matchType":"DRG_ATTACHMENT_TYPE"}],"priority":"1"}]'
-export drgsharedrdstats='[{"action":"ACCEPT","matchCriteria":[],"priority":"1"}]'
-export sharedvcnrtdrgname="DRG-ATTACH-RT"
+
+export vcn_shared_cidrs='["172.16.100.0/24"]'
+export vcn_shared_displayname="TEST_SHARED_VCN"
+export vcn_shared_dnslabel="sharedvcn"
+export vcn_shared_rt_drgattach_displayname="DRG-ATTACH-RT"
+export vcn_shared_subnet1_cidr="172.16.100.0/27"
+export vcn_shared_subnet1_displayname="Public_Subnet_1"
+
+export drg1_displayname="HUB_DRG"
+export drg1_rt_sharedvcn_displayname="DRG_RT_SHARED_VCN"
+export drg1_rd_sharedvcn_displayname="DRG_RD_SHARED_VCN"
+export drg1_rd_sharedvcn_statements='[{"action":"ACCEPT","matchCriteria":[{"attachmentType":"VIRTUAL_CIRCUIT","matchType":"DRG_ATTACHMENT_TYPE"}],"priority":"3"}]'
+export drg1_attach_sharedvcn_displayname="DRG_ATTACH_SHARED_VCN"
+
+date > output.log
 
 #SHARED VCN 
 #VCN Creation
-vcn=$(oci network vcn create --compartment-id $compocid --cidr-blocks $vcncidrs --display-name $vcndisplayname --dns-label $dnslabel)
-export vcnocid=$(echo $vcn | jq -r .data.id)
-echo SHARED VCN OCID : $vcnocid
+vcn_shared=$(oci network vcn create --compartment-id $compocid --cidr-blocks $vcn_shared_cidrs --display-name $vcn_shared_displayname --dns-label $vcn_shared_dnslabel)
+export vcn_shared_ocid=$(echo $vcn_shared | jq -r .data.id)
+echo vcn_shared_ocid=$vcn_shared_ocid >> output.log
 
 #Subnet Creation
-subnet=$(oci network subnet create --cidr-block $cidr_block $subnet1cidr --compartment-id $compocid --vcn-id $vcnocid --display-name $subnetname --prohibit-public-ip-on-vnic false)
-export subnetocid=$(echo $subnet | jq -r .data.id)
-echo SHARED Subnet OCID : $vcnocid
+vcn_shared_subnet1=$(oci network subnet create --cidr-block $vcn_shared_subnet1_cidr --compartment-id $compocid --vcn-id $vcn_shared_ocid --display-name $vcn_shared_subnet1_displayname --prohibit-public-ip-on-vnic false)
+export vcn_shared_subnet1_ocid=$(echo $vcn_shared_subnet1 | jq -r .data.id)
+echo vcn_shared_subnet1_ocid=$vcn_shared_subnet1_ocid >> output.log
 
 #Internet Gateway Creation
-ig=$(oci network internet-gateway create --compartment-id $compocid --vcn-id $vcnocid --display-name "IGW" --is-enabled "true")
-export igocid=$(echo $ig | jq -r .data.id)
-echo SHARED IG OCID : $igocid
+vcn_shared_ig=$(oci network internet-gateway create --compartment-id $compocid --vcn-id $vcn_shared_ocid --display-name "IGW" --is-enabled "true")
+export vcn_shared_ig_ocid=$(echo $vcn_shared_ig | jq -r .data.id)
+echo vcn_shared_ig_ocid=$vcn_shared_ig_ocid >> output.log
 
 #DRG Creation
-drg=$(oci network drg create --compartment-id $compocid --display-name $drgname --wait-for-state AVAILABLE --wait-interval-seconds 1)
-export drgocid=$(echo $drg | jq -r .data.id)
-echo HUB DRG OCID : $drgocid
+drg1=$(oci network drg create --compartment-id $compocid --display-name $drg1_displayname --wait-for-state AVAILABLE --wait-interval-seconds 1)
+export drg1_ocid=$(echo $drg1 | jq -r .data.id)
+echo drg1_ocid=$drg1_ocid >> output.log
 
 #------------------------------------------------------
 
 # NVA Creation
 # oci iam availability-domain list
-export ad="fyxu:eu-amsterdam-1-AD-1"
+export ad="xxxx:eu-amsterdam-1-AD-1"
 export imageocid="ocid1.image.oc1.eu-amsterdam-1.aaaaaaaazfzdd7xsbfnojjdnwul4zm4hwzb2ulja3ln6o7bglf4n6nfb3dma"
 export vmshape="VM.Standard.E2.1"
 export vmname="NVA-VM-1"
-vm=$(oci compute instance launch --compartment-id $compocid --availability-domain $ad --display-name $vmname --image-id $imageocid --shape $vmshape --subnet-id $subnetocid --skip-source-dest-check true --assign-public-ip true)
+vm=$(oci compute instance launch --compartment-id $compocid --availability-domain $ad --display-name $vmname --image-id $imageocid --shape $vmshape --subnet-id $vcn_shared_subnet1_ocid --skip-source-dest-check true --assign-public-ip true)
 export vmocid=$(echo $vm | jq -r .data.id)
-echo NVA VM OCID : $privipocid
+echo vmocid=$vmocid >> output.log
 
 sleep 10
 
@@ -53,132 +56,219 @@ vnicattach=$(oci compute vnic-attachment list --compartment-id $compocid --insta
 export vnicocid=$(echo $vnicattach | jq .data | jq -r '.[] | ."vnic-id"')
 privip=$(oci network private-ip list --vnic-id $vnicocid)
 export privipocid=$(echo $privip | jq .data | jq -r '.[] | ."id"')
-echo NVA VNIC OCID : $privipocid
+echo privipocid=$privipocid >> output.log
 
 #------------------------------------------------------
-
 #DRG Route Distribution Creation (Shared VCN) 
-drgrdshared=$(oci network drg-route-distribution create --distribution-type "IMPORT" --drg-id $drgocid --display-name $drgsharedrdname)
-export drgrdsharedocid=$(echo $drgrdshared | jq -r .data.id)
+drg1_rd_sharedvcn=$(oci network drg-route-distribution create --distribution-type "IMPORT" --drg-id $drg1_ocid --display-name $drg1_rd_sharedvcn_displayname)
+export drg1_rd_sharedvcn_ocid=$(echo $drg1_rd_sharedvcn | jq -r .data.id)
+echo drg1_rd_sharedvcn_ocid=$drg1_rd_sharedvcn_ocid >> output.log
 
 #DRG Route Distribution Statement Creation 
-drgrdsharedstat=$(oci network drg-route-distribution-statement add --route-distribution-id $drgrdsharedocid --statements $drgsharedrdstats)
-export drgrdsharedstatid=$(echo $drgrdsharedstat | jq .data | jq -r '.[] | ."id"')
+drg1_rd_sharedvcn_stat=$(oci network drg-route-distribution-statement add --route-distribution-id $drg1_rd_sharedvcn_ocid --statements $drg1_rd_sharedvcn_statements)
+export drg1_rd_sharedvcn_stat_id=$(echo $drg1_rd_sharedvcn_stat | jq .data | jq -r '.[] | ."id"')
+echo drg1_rd_sharedvcn_stat_id=$drg1_rd_sharedvcn_stat_id >> output.log
 
 #DRG Route Table Creation (Shared VCN)
-drgrtshared=$(oci network drg-route-table create --drg-id $drgocid --display-name $drgsharedrtname --import-route-distribution-id $drgrdsharedocid --wait-for-state AVAILABLE --wait-interval-seconds 1)
-export drgrtsharedocid=$(echo $drgrtshared | jq -r .data.id)
+drg1_rt_sharedvcn=$(oci network drg-route-table create --drg-id $drg1_ocid --display-name $drg1_rt_sharedvcn_displayname --import-route-distribution-id $drg1_rd_sharedvcn_ocid --wait-for-state AVAILABLE --wait-interval-seconds 1)
+export drg1_rt_sharedvcn_ocid=$(echo $drg1_rt_sharedvcn | jq -r .data.id)
+echo drg1_rt_sharedvcn_ocid=$drg1_rt_sharedvcn_ocid >> output.log
 
 #VCN Route Table Creation (Shared VCN DRG-ATTACH-RT)
 #sharedvcnrtdrg=$(oci network route-table create --compartment-id $compocid --vcn-id $vcnocid --display-name $sharedvcnrtdrgname --route-rules '[{"cidrBlock":"10.0.0.0/8","networkEntityId":"ocid1.internetgateway.oc1.phx.aaaaaaaaxtfqb2srw7hoi5cmdum4n6ow2xm2zhrzqqypmlteiiebtmvl75ya"}]')
-sharedvcnrtdrg=$(oci network route-table create --compartment-id $compocid --vcn-id $vcnocid --display-name $sharedvcnrtdrgname --route-rules '[{"cidrBlock":"10.0.0.0/8","networkEntityId":"'$privipocid'"},{"cidrBlock":"172.16.0.0/12","networkEntityId":"'$privipocid'"},{"cidrBlock":"192.168.0.0/16","networkEntityId":"'$privipocid'"}]')
-export sharedvcnrtdrgocid=$(echo $sharedvcnrtdrg | jq -r .data.id)
+vcn_shared_rt_drgattach=$(oci network route-table create --compartment-id $compocid --vcn-id $vcn_shared_ocid --display-name $vcn_shared_rt_drgattach_displayname --route-rules '[{"cidrBlock":"10.0.0.0/8","networkEntityId":"'$privipocid'"},{"cidrBlock":"172.16.0.0/12","networkEntityId":"'$privipocid'"},{"cidrBlock":"192.168.0.0/16","networkEntityId":"'$privipocid'"}]')
+export vcn_shared_rt_drgattach_ocid=$(echo $vcn_shared_rt_drgattach | jq -r .data.id)
+echo dvcn_shared_rt_drgattach_ocid= $vcn_shared_rt_drgattach_ocid >> output.log
 
 #DRG Attachment
-drgattach=$(oci network drg-attachment create --drg-id $drgocid --display-name $drgattachname --drg-route-table-id $drgrtsharedocid --route-table-id $sharedvcnrtdrgocid --vcn-id $vcnocid --wait-for-state ATTACHED --wait-interval-seconds 1)
-export drgattachocid=$(echo $drgattach | jq -r .data.id)
+drg1_attach_sharedvcn=$(oci network drg-attachment create --drg-id $drg1_ocid --display-name $drg1_attach_sharedvcn_displayname --drg-route-table-id $drg1_rt_sharedvcn_ocid --route-table-id $vcn_shared_rt_drgattach_ocid --vcn-id $vcn_shared_ocid --wait-for-state ATTACHED --wait-interval-seconds 1)
+export drg1_attach_sharedvcn_ocid=$(echo $drg1_attach_sharedvcn | jq -r .data.id)
+echo drg1_attach_sharedvcn_ocid=$drg1_attach_sharedvcn_ocid >> output.log
 
-export drgspokesrdname="DRG_RD_SPOKES_VCN"
-export drgspokesrtname="DRG_RT_SPOKES_VCN"
-export drgspokesrdstats='[{"action":"ACCEPT","matchCriteria":[{"drgAttachmentId":"'$drgattachocid'","matchType":"DRG_ATTACHMENT_ID"}],"priority":"1"}]'
+#VCN SHARED Route Table Creation (Public-Subnet-RT)
+export vcn_shared_rt_pubsub_displayname="Public_Subnet_RT"
+
+vcn_shared_rt_pubsub=$(oci network route-table create --compartment-id $compocid --vcn-id $vcn_shared_ocid --display-name $vcn_shared_rt_pubsub_displayname --route-rules '[{"cidrBlock":"0.0.0.0/0","networkEntityId":"'$vcn_shared_ig_ocid'"},{"cidrBlock":"10.0.0.0/8","networkEntityId":"'$drg1_ocid'"},{"cidrBlock":"172.16.0.0/12","networkEntityId":"'$drg1_ocid'"},{"cidrBlock":"192.168.0.0/16","networkEntityId":"'$drg1_ocid'"}]')
+export vcn_shared_rt_pubsub_ocid=$(echo $vcn_shared_rt_pubsub | jq -r .data.id)
+echo vcn_shared_rt_pubsub_ocid= $vcn_shared_rt_pubsub_ocid >> output.log
+
+#Assign PubSub-RT to Subnet1
+oci network subnet update --subnet-id $vcn_shared_subnet1_ocid --route-table-id $vcn_shared_rt_pubsub_ocid
+
+
+export drg1_rt_spokesvcn_displayname="DRG_RT_SPOKES_VCN"
+export drg1_rd_spokesvcn_displayname="DRG_RD_SPOKES_VCN"
+export drg1_rd_spokesvcn_statements='[{"action":"ACCEPT","matchCriteria":[{"drgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","matchType":"DRG_ATTACHMENT_ID"}],"priority":"1"}]'
+
 
 #DRG Route Distribution Creation (SPOKE VCN) 
-drgrdspoke=$(oci network drg-route-distribution create --distribution-type "IMPORT" --drg-id $drgocid --display-name $drgspokesrdname)
-export drgrdspokeocid=$(echo $drgrdspoke | jq -r .data.id)
+drg1_rd_spokesvcn=$(oci network drg-route-distribution create --distribution-type "IMPORT" --drg-id $drg1_ocid --display-name $drg1_rd_spokesvcn_displayname)
+export drg1_rd_spokesvcn_ocid=$(echo $drg1_rd_spokesvcn | jq -r .data.id)
+echo drg1_rd_spokesvcn_ocid=$drg1_rd_spokesvcn_ocid >> output.log
 
 #DRG Route Distribution Statement Creation (SPOKE VCN)
-drgrdspokestat=$(oci network drg-route-distribution-statement add --route-distribution-id $drgrdspokeocid --statements $drgspokesrdstats)
-#drgrdspokestat=$(oci network drg-route-distribution-statement add --route-distribution-id $drgrdspokeocid --statements '[{"action":"ACCEPT","matchCriteria":[{"drgAttachmentId":"'$drgattachocid'","matchType":"DRG_ATTACHMENT_ID"}],"priority":"1"}]')
-export drgrdspokestatid=$(echo $drgrdspokestat | jq .data | jq -r '.[] | ."id"')
+drg1_rd_spokesvcn_stat=$(oci network drg-route-distribution-statement add --route-distribution-id $drg1_rd_spokesvcn_ocid --statements $drg1_rd_spokesvcn_statements)
+export drg1_rd_spokesvcn_stat_id=$(echo $drg1_rd_spokesvcn_stat | jq .data | jq -r '.[] | ."id"')
+echo drg1_rd_spokesvcn_stat_id=$drg1_rd_spokesvcn_stat_id >> output.log
 
 #DRG Route Table Creation (SPOKE VCN)
-drgrtspoke=$(oci network drg-route-table create --drg-id $drgocid --display-name $drgspokesrtname --import-route-distribution-id $drgrdspokeocid --wait-for-state AVAILABLE --wait-interval-seconds 1)
-export drgrtspokeocid=$(echo $drgrtspoke | jq -r .data.id)
+drg1_rt_spokesvcn=$(oci network drg-route-table create --drg-id $drg1_ocid --display-name $drg1_rt_spokesvcn_displayname --import-route-distribution-id $drg1_rd_spokesvcn_ocid --wait-for-state AVAILABLE --wait-interval-seconds 1)
+export drg1_rt_spokesvcn_ocid=$(echo $drg1_rt_spokesvcn | jq -r .data.id)
+echo drg1_rt_spokesvcn_ocid=$drg1_rt_spokesvcn_ocid >> output.log
 
 #Set DRG_RT_SPOKES as default for VCNs
-oci network drg update --drg-id $drgocid --default-drg-route-tables '{"vcn":"'$drgrtspokeocid'"}' --force
+oci network drg update --drg-id $drg1_ocid --default-drg-route-tables '{"vcn":"'$drg1_rt_spokesvcn_ocid'"}' --force
 
 #------------------------------------------------------------------------------
 
 #SPOKE VCN 1 
-export sp1vcncidrs='["172.16.101.0/24"]'
-export sp1subnet1cidr="172.16.101.0/27"
-export sp1vcndisplayname="SPOKE_VCN_1"
-export sp1dnslabel="spokevcn1"
-export sp1drgattachname="DRG_ATTACH_SPOKE_VCN_1"
+
+export vcn_spoke1_cidrs='["172.16.101.0/24"]'
+export vcn_spoke1_subnet_1_cidr="172.16.101.0/27"
+export vcn_spoke1_displayname="TEST_SPOKE_VCN_1"
+export vcn_spoke1_dnslabel="spokevcn1"
+export drg1_attach_spoke1_displayname="DRG_ATTACH_SPOKE_VCN_1"
 
 #VCN Creation
-sp1vcn=$(oci network vcn create --compartment-id $compocid --cidr-blocks $sp1vcncidrs --display-name $sp1vcndisplayname --dns-label $sp1dnslabel)
-export sp1vcnocid=$(echo $sp1vcn | jq -r .data.id)
-echo SPOKE VCN 1 OCID : $sp1vcnocid
+vcn_spoke1=$(oci network vcn create --compartment-id $compocid --cidr-blocks $vcn_spoke1_cidrs --display-name $vcn_spoke1_displayname --dns-label $vcn_spoke1_dnslabel)
+export vcn_spoke1_ocid=$(echo $vcn_spoke1 | jq -r .data.id)
+echo vcn_spoke1_ocid=$vcn_spoke1_ocid >> output.log
 
 #Subnet Creation
-sp1subnet=$(oci network subnet create --cidr-block $sp1subnet1cidr --compartment-id $compocid --vcn-id $sp1vcnocid --prohibit-public-ip-on-vnic false)
-export sp1subnetocid=$(echo $sp1subnet | jq -r .data.id)
-echo SPOKE 1 Subnet 1 OCID : $sp1subnetocid
+vcn_spoke1_subnet1=$(oci network subnet create --cidr-block $vcn_spoke1_subnet_1_cidr --compartment-id $compocid --vcn-id $vcn_spoke1_ocid --prohibit-public-ip-on-vnic false)
+export vcn_spoke1_subnet1_ocid=$(echo $vcn_spoke1_subnet1 | jq -r .data.id)
+echo vcn_spoke1_subnet1_ocid=$vcn_spoke1_subnet1_ocid >> output.log
 
 #Internet Gateway Creation
-sp1ig=$(oci network internet-gateway create --compartment-id $compocid --vcn-id $sp1vcnocid --display-name "IGW" --is-enabled "true")
-export sp1igocid=$(echo $sp1ig | jq -r .data.id)
-echo SPOKE 1 IG OCID : $sp1igocid
+vcn_spoke1_ig=$(oci network internet-gateway create --compartment-id $compocid --vcn-id $vcn_spoke1_ocid --display-name "IGW" --is-enabled "true")
+export vcn_spoke1_ig_ocid=$(echo $vcn_spoke1_ig | jq -r .data.id)
+echo vcn_spoke1_ig_ocid=$vcn_spoke1_ig_ocid >> output.log
 
 #DRG Attachment
-sp1drgattach=$(oci network drg-attachment create --drg-id $drgocid --display-name $sp1drgattachname --vcn-id $sp1vcnocid)
-export sp1drgattachocid=$(echo $sp1drgattach | jq -r .data.id)
+drg1_attach_spoke1=$(oci network drg-attachment create --drg-id $drg1_ocid --display-name $drg1_attach_spoke1_displayname --vcn-id $vcn_spoke1_ocid)
+export drg1_attach_spoke1_ocid=$(echo $drg1_attach_spoke1 | jq -r .data.id)
+echo drg1_attach_spoke1_ocid=$drg1_attach_spoke1_ocid >> output.log
+
+
+#VCN SPOKE1 Route Table Creation (Public-Subnet-RT)
+export vcn_spoke1_rt_pubsub_displayname="Public_Subnet_RT"
+
+vcn_spoke1_rt_pubsub=$(oci network route-table create --compartment-id $compocid --vcn-id $vcn_spoke1_ocid --display-name $vcn_spoke1_rt_pubsub_displayname --route-rules '[{"cidrBlock":"0.0.0.0/0","networkEntityId":"'$vcn_spoke1_ig_ocid'"},{"cidrBlock":"10.0.0.0/8","networkEntityId":"'$drg1_ocid'"},{"cidrBlock":"172.16.0.0/12","networkEntityId":"'$drg1_ocid'"},{"cidrBlock":"192.168.0.0/16","networkEntityId":"'$drg1_ocid'"}]')
+export vcn_spoke1_rt_pubsub_ocid=$(echo $vcn_spoke1_rt_pubsub | jq -r .data.id)
+echo vcn_spoke1_rt_pubsub_ocid=$vcn_spoke1_rt_pubsub_ocid >> output.log
+
+#Assign PubSub-RT to Subnet1
+oci network subnet update --subnet-id $vcn_spoke1_subnet1_ocid --route-table-id $vcn_spoke1_rt_pubsub_ocid
+
 
 #------------------------------------------------
+
 #SPOKE VCN 2
  
-export sp2vcncidrs='["172.16.102.0/24"]'
-export sp2subnet1cidr="172.16.102.0/27"
-export sp2vcndisplayname="SPOKE_VCN_2"
-export sp2dnslabel="spokevcn2"
-export sp2drgattachname="DRG_ATTACH_SPOKE_VCN_2"
-
+export vcn_spoke2_cidrs='["172.16.102.0/24"]'
+export vcn_spoke2_subnet_1_cidr="172.16.102.0/27"
+export vcn_spoke2_displayname="TEST_SPOKE_VCN_2"
+export vcn_spoke2_dnslabel="spokevcn2"
+export drg1_attach_spoke2_displayname="DRG_ATTACH_SPOKE_VCN_2"
 
 #VCN Creation
-sp2vcn=$(oci network vcn create --compartment-id $compocid --cidr-blocks $sp2vcncidrs --display-name $sp2vcndisplayname --dns-label $sp2dnslabel)
-export sp2vcnocid=$(echo $sp2vcn | jq -r .data.id)
-echo SPOKE VCN 2 OCID : $sp2vcnocid
+vcn_spoke2=$(oci network vcn create --compartment-id $compocid --cidr-blocks $vcn_spoke2_cidrs --display-name $vcn_spoke2_displayname --dns-label $vcn_spoke2_dnslabel)
+export vcn_spoke2_ocid=$(echo $vcn_spoke2 | jq -r .data.id)
+echo vcn_spoke2_ocid=$vcn_spoke2_ocid >> output.log
 
 #Subnet Creation
-sp2subnet=$(oci network subnet create --cidr-block $sp2subnet1cidr --compartment-id $compocid --vcn-id $sp2vcnocid --prohibit-public-ip-on-vnic false)
-export sp2subnetocid=$(echo $sp2subnet | jq -r .data.id)
-echo SPOKE 2 Subnet 1 OCID : $sp2subnetocid
+vcn_spoke2_subnet1=$(oci network subnet create --cidr-block $vcn_spoke2_subnet_1_cidr --compartment-id $compocid --vcn-id $vcn_spoke2_ocid --prohibit-public-ip-on-vnic false)
+export vcn_spoke2_subnet1_ocid=$(echo $vcn_spoke2_subnet1 | jq -r .data.id)
+echo vcn_spoke2_subnet1_ocid=$vcn_spoke2_subnet1_ocid >> output.log
 
 #Internet Gateway Creation
-sp2ig=$(oci network internet-gateway create --compartment-id $compocid --vcn-id $sp2vcnocid --display-name "IGW" --is-enabled "true")
-export sp2igocid=$(echo $sp2ig | jq -r .data.id)
-echo SPOKE 1 IG OCID : $sp2igocid
+vcn_spoke2_ig=$(oci network internet-gateway create --compartment-id $compocid --vcn-id $vcn_spoke2_ocid --display-name "IGW" --is-enabled "true")
+export vcn_spoke2_ig_ocid=$(echo $vcn_spoke2_ig | jq -r .data.id)
+echo vcn_spoke2_ig_ocid=$vcn_spoke2_ig_ocid >> output.log
 
 #DRG Attachment
-sp2drgattach=$(oci network drg-attachment create --drg-id $drgocid --display-name $sp2drgattachname --vcn-id $sp2vcnocid)
-export sp2drgattachocid=$(echo $sp2drgattach | jq -r .data.id)
+drg1_attach_spoke2=$(oci network drg-attachment create --drg-id $drg1_ocid --display-name $drg1_attach_spoke2_displayname --vcn-id $vcn_spoke2_ocid)
+export drg1_attach_spoke2_ocid=$(echo $drg1_attach_spoke2 | jq -r .data.id)
+echo drg1_attach_spoke2_ocid=$drg1_attach_spoke2_ocid >> output.log
+
+
+#VCN SPOKE2 Route Table Creation (Public-Subnet-RT)
+export vcn_spoke2_rt_pubsub_displayname="Public_Subnet_RT"
+
+vcn_spoke2_rt_pubsub=$(oci network route-table create --compartment-id $compocid --vcn-id $vcn_spoke2_ocid --display-name $vcn_spoke2_rt_pubsub_displayname --route-rules '[{"cidrBlock":"0.0.0.0/0","networkEntityId":"'$vcn_spoke2_ig_ocid'"},{"cidrBlock":"10.0.0.0/8","networkEntityId":"'$drg1_ocid'"},{"cidrBlock":"172.16.0.0/12","networkEntityId":"'$drg1_ocid'"},{"cidrBlock":"192.168.0.0/16","networkEntityId":"'$drg1_ocid'"}]')
+export vcn_spoke2_rt_pubsub_ocid=$(echo $vcn_spoke2_rt_pubsub | jq -r .data.id)
+echo vcn_spoke2_rt_pubsub_ocid=$vcn_spoke2_rt_pubsub_ocid >> output.log
+
+#Assign PubSub-RT to Subnet1
+oci network subnet update --subnet-id $vcn_spoke2_subnet1_ocid --route-table-id $vcn_spoke2_rt_pubsub_ocid
 
 #------------------------------------------------
+
 #Create FastConnect DRG-RT and DRG-RD
 
-export drgfcrdname="DRG_RD_FC_VCN"
-export drgfcrtname="DRG_RT_FC_VCN"
-export drgfcrdstats='[{"action":"ACCEPT","matchCriteria":[{"drgAttachmentId":"'$drgattachocid'","matchType":"DRG_ATTACHMENT_ID"}],"priority":"1"}]'
+export drg1_rd_fc_displayname="DRG_RD_FC_VCN"
+export drg1_rt_fc_displayname="DRG_RT_FC_VCN"
+export drg1_rd_fc_statements='[{"action":"ACCEPT","matchCriteria":[{"drgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","matchType":"DRG_ATTACHMENT_ID"}],"priority":"1"}]'
 
 #DRG Route Distribution Creation (DRG-RD-FC) 
-drgrdfc=$(oci network drg-route-distribution create --distribution-type "IMPORT" --drg-id $drgocid --display-name $drgfcrdname)
-export drgrdfcocid=$(echo $drgrdfc | jq -r .data.id)
+drg1_rd_fc=$(oci network drg-route-distribution create --distribution-type "IMPORT" --drg-id $drg1_ocid --display-name $drg1_rd_fc_displayname)
+export drg1_rd_fc_ocid=$(echo $drg1_rd_fc | jq -r .data.id)
+echo drg1_rd_fc_ocid=$drg1_rd_fc_ocid >> output.log
 
 #DRG Route Distribution Statement Creation (DRG-RD-FC)
-drgrdfcstat=$(oci network drg-route-distribution-statement add --route-distribution-id $drgrdfcocid --statements $drgfcrdstats)
+drg1_rd_fc_stat=$(oci network drg-route-distribution-statement add --route-distribution-id $drg1_rd_fc_ocid --statements $drg1_rd_fc_statements)
 #drgrdspokestat=$(oci network drg-route-distribution-statement add --route-distribution-id $drgrdspokeocid --statements '[{"action":"ACCEPT","matchCriteria":[{"drgAttachmentId":"'$drgattachocid'","matchType":"DRG_ATTACHMENT_ID"}],"priority":"1"}]')
-export drgrdfcstatid=$(echo $drgrdfcstat | jq .data | jq -r '.[] | ."id"')
+export drg1_rd_fc_stat_id=$(echo $drg1_rd_fc_stat | jq .data | jq -r '.[] | ."id"')
+echo drg1_rd_fc_stat_id=$drg1_rd_fc_stat_id >> output.log
 
 #DRG Route Table Creation (DRG-RT-FC)
-#drgrtfc=$(oci network drg-route-table create --drg-id $drgocid --display-name $drgfcrtname --import-route-distribution-id $drgrdfcocid --wait-for-state AVAILABLE --wait-interval-seconds 1)
-drgrtfc=$(oci network drg-route-table create --drg-id $drgocid --display-name $drgfcrtname --wait-for-state AVAILABLE --wait-interval-seconds 1)
+drg1_rt_fc=$(oci network drg-route-table create --drg-id $drg1_ocid --display-name $drg1_rt_fc_displayname --wait-for-state AVAILABLE --wait-interval-seconds 1)
+export drg1_rt_fc_ocid=$(echo $drg1_rt_fc | jq -r .data.id)
+echo drg1_rt_fc_ocid=$drg1_rt_fc_ocid >> output.log
 
-export drgrtfcocid=$(echo $drgrtfc | jq -r .data.id)
-
-oci network drg-route-rule add --drg-route-table-id $drgrtfcocid --route-rules '[{"destination":"172.16.101.0/24","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drgattachocid'","routeType":"STATIC"},{"destination":"172.16.102.0/24","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drgattachocid'","routeType":"STATIC"}]'
+oci network drg-route-rule add --drg-route-table-id $drg1_rt_fc_ocid --route-rules '[{"destination":"172.16.101.0/24","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","routeType":"STATIC"},{"destination":"172.16.102.0/24","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","routeType":"STATIC"}]'
 
 #Set DRG_RT_FC as default for VCNs
-oci network drg update --drg-id $drgocid --default-drg-route-tables '{"virtual-circuit":"'$drgrtfcocid'"}' --force
+oci network drg update --drg-id $drg1_ocid --default-drg-route-tables '{"virtual-circuit":"'$drg1_rt_fc_ocid'"}' --force
+
+
+#-----------------------------------------------------
+# Fix DRG RT SHARED VCN
+
+export drg1_rd_sharedvcn_statements_post='[{"action":"ACCEPT","matchCriteria":[{"drgAttachmentId":"'$drg1_attach_spoke2_ocid'","matchType":"DRG_ATTACHMENT_ID"}],"priority":"2"},{"action":"ACCEPT","matchCriteria":[{"drgAttachmentId":"'$drg1_attach_spoke1_ocid'","matchType":"DRG_ATTACHMENT_ID"}],"priority":"1"}]'
+
+#DRG Route Distribution Statement Creation 
+
+drg1_rd_sharedvcn_stat_post=$(oci network drg-route-distribution-statement add --route-distribution-id $drg1_rd_sharedvcn_ocid --statements $drg1_rd_sharedvcn_statements_post)
+export drg1_rd_sharedvcn_stat_post_id=$(echo $drg1_rd_sharedvcn_stat_post | jq .data | jq -r '.[] | ."id"')
+
+#------------------------------------------------------
+
+# VM SPOKE1 Creation
+# oci iam availability-domain list
+export ad="xxxx:eu-amsterdam-1-AD-1"
+export imageocid="ocid1.image.oc1.eu-amsterdam-1.aaaaaaaazfzdd7xsbfnojjdnwul4zm4hwzb2ulja3ln6o7bglf4n6nfb3dma"
+export vmshape="VM.Standard.E2.1"
+export vmspoke1name="VM-SPOKE-1"
+spoke1vm=$(oci compute instance launch --compartment-id $compocid --availability-domain $ad --display-name $vmspoke1name --image-id $imageocid --shape $vmshape --subnet-id $vcn_spoke1_subnet1_ocid --skip-source-dest-check false --assign-public-ip true)
+export vmspoke1ocid=$(echo $spoke1vm | jq -r .data.id)
+echo vmspoke1ocid=$vmspoke1ocid >> output.log
+
+#------------------------------------------------------
+
+# VM SPOKE2 Creation
+# oci iam availability-domain list
+export ad="xxxx:eu-amsterdam-1-AD-1"
+export imageocid="ocid1.image.oc1.eu-amsterdam-1.aaaaaaaazfzdd7xsbfnojjdnwul4zm4hwzb2ulja3ln6o7bglf4n6nfb3dma"
+export vmshape="VM.Standard.E2.1"
+export vmspoke2name="VM-SPOKE-2"
+spoke2vm=$(oci compute instance launch --compartment-id $compocid --availability-domain $ad --display-name $vmspoke2name --image-id $imageocid --shape $vmshape --subnet-id $vcn_spoke2_subnet1_ocid --skip-source-dest-check false --assign-public-ip true)
+export vmspoke2ocid=$(echo $spoke2vm | jq -r .data.id)
+echo vmspoke2ocid=$vmspoke2ocid >> output.log
+
+date >> output.log
+
+echo #--------------------------------------------------
+cat output.log
+echo #--------------------------------------------------
 
