@@ -58,6 +58,10 @@ export vmname="NVA-VM-1"
 echo $ssh_public_key > sshkeyfile.pub
 export ssh_auth_keys_file="./sshkeyfile.pub"
 
+rm -f cloudinit_nva.sh
+  wget https://raw.githubusercontent.com/BaptisS/oci_hub-and-spoke_nva_drgv2/main/cloudinit_nva.sh
+  chmod +rx cloudinit_nva.sh 
+
 #vm=$(oci compute instance launch --compartment-id $compocid --availability-domain $ad --display-name $vmname --image-id $imageocid --shape $vmshape --subnet-id $vcn_shared_subnet1_ocid --skip-source-dest-check true --assign-public-ip true)
 
 vm=$(oci compute instance launch \
@@ -69,6 +73,7 @@ vm=$(oci compute instance launch \
     --subnet-id $vcn_shared_subnet1_ocid \
     --skip-source-dest-check true \
     --assign-public-ip true \
+    --user-data-file "./cloudinit_nva.sh" \
     --ssh-authorized-keys-file "${ssh_auth_keys_file}")
 export vmocid=$(echo $vm | jq -r .data.id)
 echo vmocid=$vmocid >> output.log
@@ -109,7 +114,7 @@ echo drg1_rt_sharedvcn_ocid=$drg1_rt_sharedvcn_ocid >> output.log
 #sharedvcnrtdrg=$(oci network route-table create --compartment-id $compocid --vcn-id $vcnocid --display-name $sharedvcnrtdrgname --route-rules '[{"cidrBlock":"10.0.0.0/8","networkEntityId":"ocid1.internetgateway.oc1.phx.aaaaaaaaxtfqb2srw7hoi5cmdum4n6ow2xm2zhrzqqypmlteiiebtmvl75ya"}]')
 vcn_shared_rt_drgattach=$(oci network route-table create --compartment-id $compocid --vcn-id $vcn_shared_ocid --display-name $vcn_shared_rt_drgattach_displayname --route-rules '[{"cidrBlock":"10.0.0.0/8","networkEntityId":"'$privipocid'","description":"RFC1918"},{"cidrBlock":"172.16.0.0/12","networkEntityId":"'$privipocid'","description":"RFC1918"},{"cidrBlock":"192.168.0.0/16","networkEntityId":"'$privipocid'","description":"RFC1918"}]')
 export vcn_shared_rt_drgattach_ocid=$(echo $vcn_shared_rt_drgattach | jq -r .data.id)
-echo dvcn_shared_rt_drgattach_ocid=$vcn_shared_rt_drgattach_ocid >> output.log
+echo vcn_shared_rt_drgattach_ocid=$vcn_shared_rt_drgattach_ocid >> output.log
 
 #DRG Attachment
 drg1_attach_sharedvcn=$(oci network drg-attachment create --drg-id $drg1_ocid --display-name $drg1_attach_sharedvcn_displayname --drg-route-table-id $drg1_rt_sharedvcn_ocid --route-table-id $vcn_shared_rt_drgattach_ocid --vcn-id $vcn_shared_ocid --wait-for-state ATTACHED --wait-interval-seconds 1)
@@ -365,6 +370,7 @@ echo vmspoke2ocid=$vmspoke2ocid >> output.log
 
 date >> output.log
 rm -f sshkeyfile.pub
+rm -f cloudinit_nva.sh
 
 echo #--------------------------------------------------
 cat output.log
