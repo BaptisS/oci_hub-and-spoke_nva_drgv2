@@ -1,5 +1,6 @@
 #!/bin/sh
 
+
 date > cleanoutput.log
 
 oci network drg-attachment delete --drg-attachment-id $drg1_attach_spoke2_ocid --force
