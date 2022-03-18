@@ -1,7 +1,8 @@
 #!/bin/sh
-echo " HUB AND SPOKE WITH NVA SOLUTiON DEPLOYEMENT "
-echo "Please wait while the resources are being deployed (approx. 4mins)" 
-
+echo " DRGv2 - HUB AND SPOKE WITH NVA SOLUTION DEPLOYMENT "
+echo "Please wait while the resources are being deployed (approx. 4 mins)"
+echo ""
+echo ""
 #export compocid="ocid1.compartment.oc1..axxxx"
 #export ssh_public_key="ssh-rsa AAAABabcdefghij"
 #export myadminsrcipv4="0.0.0.0/0"
