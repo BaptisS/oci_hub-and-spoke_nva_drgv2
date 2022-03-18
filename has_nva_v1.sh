@@ -313,7 +313,7 @@ oci network subnet update --subnet-id $vcn_spoke2_subnet1_ocid --route-table-id 
 #Create FastConnect DRG-RT and DRG-RD
 
 export drg1_rd_fc_displayname="DRG_IRD_FC-RPC-IPSEC"
-export drg1_rt_fc_displayname="DRG_RT_FC_VCN"
+export drg1_rt_fc_displayname="DRG_RT_FC-RPC-IPSEC"
 export drg1_rd_fc_statements='[{"action":"ACCEPT","matchCriteria":[{"drgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","matchType":"DRG_ATTACHMENT_ID"}],"priority":"1"}]'
 
 #DRG Route Distribution Creation (DRG-RD-FC) 
@@ -333,10 +333,11 @@ drg1_rt_fc=$(oci network drg-route-table create --drg-id $drg1_ocid --display-na
 export drg1_rt_fc_ocid=$(echo $drg1_rt_fc | jq -r .data.id)
 echo drg1_rt_fc_ocid=$drg1_rt_fc_ocid >> output.log
 
-#oci network drg-route-rule add --drg-route-table-id $drg1_rt_fc_ocid --route-rules '[{"destination":"172.16.101.0/24","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","routeType":"STATIC"},{"destination":"172.16.102.0/24","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","routeType":"STATIC"}]'
-oci network drg-route-rule add --drg-route-table-id $drg1_rt_fc_ocid --route-rules '[{"destination":"'$vcn_spoke1_cidrs'","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","routeType":"STATIC"},{"destination":"'$vcn_spoke2_cidrs'","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","routeType":"STATIC"}]'
+export vcn_spoke1_cidrs_norm=$(echo $vcn_spoke1_cidrs | sed 's/^..//' | sed 's/..$//')
+export vcn_spoke2_cidrs_norm=$(echo $vcn_spoke2_cidrs | sed 's/^..//' | sed 's/..$//')
+oci network drg-route-rule add --drg-route-table-id $drg1_rt_fc_ocid --route-rules '[{"destination":"'$vcn_spoke1_cidrs_norm'","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","routeType":"STATIC"},{"destination":"'$vcn_spoke2_cidrs_norm'","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","routeType":"STATIC"}]'
 
-#Set DRG_RT_FC as default for VCNs
+#Set DRG_RT_FC as default for VC
 oci network drg update --drg-id $drg1_ocid --default-drg-route-tables '{"virtual-circuit":"'$drg1_rt_fc_ocid'"}' --force
 
 ####  UPDATE DRG RT ATTACH  ####
