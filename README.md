@@ -1,7 +1,7 @@
 # oci_hub-and-spoke_nva_drgv2
 
 
-![PMScreens](https://raw.githubusercontent.com/BaptisS/oci_hub-and-spoke_nva_drgv2/master/diag1.png)
+![PMScreens](https://raw.githubusercontent.com/BaptisS/oci_hub-and-spoke_nva_drgv2/master/diag0.png)
 
 
 export compocid="ocid1.compartment.oc1..axxxx"
