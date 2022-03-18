@@ -117,7 +117,8 @@ echo drg1_rt_sharedvcn_ocid=$drg1_rt_sharedvcn_ocid >> output.log
 
 #VCN Route Table Creation (Shared VCN DRG-ATTACH-RT)
 #sharedvcnrtdrg=$(oci network route-table create --compartment-id $compocid --vcn-id $vcnocid --display-name $sharedvcnrtdrgname --route-rules '[{"cidrBlock":"10.0.0.0/8","networkEntityId":"ocid1.internetgateway.oc1.phx.aaaaaaaaxtfqb2srw7hoi5cmdum4n6ow2xm2zhrzqqypmlteiiebtmvl75ya"}]')
-vcn_shared_rt_drgattach=$(oci network route-table create --compartment-id $compocid --vcn-id $vcn_shared_ocid --display-name $vcn_shared_rt_drgattach_displayname --route-rules '[{"cidrBlock":"10.0.0.0/8","networkEntityId":"'$privipocid'","description":"RFC1918"},{"cidrBlock":"172.16.0.0/12","networkEntityId":"'$privipocid'","description":"RFC1918"},{"cidrBlock":"192.168.0.0/16","networkEntityId":"'$privipocid'","description":"RFC1918"}]')
+#vcn_shared_rt_drgattach=$(oci network route-table create --compartment-id $compocid --vcn-id $vcn_shared_ocid --display-name $vcn_shared_rt_drgattach_displayname --route-rules '[{"cidrBlock":"10.0.0.0/8","networkEntityId":"'$privipocid'","description":"RFC1918"},{"cidrBlock":"172.16.0.0/12","networkEntityId":"'$privipocid'","description":"RFC1918"},{"cidrBlock":"192.168.0.0/16","networkEntityId":"'$privipocid'","description":"RFC1918"}]')
+vcn_shared_rt_drgattach=$(oci network route-table create --compartment-id $compocid --vcn-id $vcn_shared_ocid --display-name $vcn_shared_rt_drgattach_displayname --route-rules '[{"cidrBlock":"0.0.0.0/0","networkEntityId":"'$privipocid'","description":"Default Route To NVA"}]')
 export vcn_shared_rt_drgattach_ocid=$(echo $vcn_shared_rt_drgattach | jq -r .data.id)
 echo vcn_shared_rt_drgattach_ocid=$vcn_shared_rt_drgattach_ocid >> output.log
 
