@@ -337,8 +337,8 @@ export vcn_spoke1_cidrs_norm=$(echo $vcn_spoke1_cidrs | sed 's/^..//' | sed 's/.
 export vcn_spoke2_cidrs_norm=$(echo $vcn_spoke2_cidrs | sed 's/^..//' | sed 's/..$//')
 oci network drg-route-rule add --drg-route-table-id $drg1_rt_fc_ocid --route-rules '[{"destination":"'$vcn_spoke1_cidrs_norm'","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","routeType":"STATIC"},{"destination":"'$vcn_spoke2_cidrs_norm'","destinationType":"CIDR_BLOCK","nextHopDrgAttachmentId":"'$drg1_attach_sharedvcn_ocid'","routeType":"STATIC"}]'
 
-#Set DRG_RT_FC as default for VC
-oci network drg update --drg-id $drg1_ocid --default-drg-route-tables '{"virtual-circuit":"'$drg1_rt_fc_ocid'"}' --force
+#Set DRG_RT_FC as default for VC, IPSEC, RPC
+oci network drg update --drg-id $drg1_ocid --default-drg-route-tables '{"virtual-circuit":"'$drg1_rt_fc_ocid'","ipsec-tunnel":"'$drg1_rt_fc_ocid'","remote-peering-connection":"'$drg1_rt_fc_ocid'"}' --force
 
 ####  UPDATE DRG RT ATTACH  ####
 
