@@ -54,11 +54,10 @@ echo vcn_shared_rt_default_ocid=$vcn_shared_rt_default_ocid >> output.log
 
 ####  NVA VM  ####
 
-# NVA Creation
+# NVA VM Creation (oracle Linux 8 with Ip forwarding enabled)
 export ad=$(oci iam availability-domain list --query 'data[0].name' --raw-output)
 export vmshape=$(oci compute shape list --compartment-id $compocid --all --query 'data[?"memory-in-gbs" == `15.0`] | [0].shape' --raw-output)
 export imageocid=$(oci compute image list --compartment-id $compocid --operating-system 'Oracle Linux' --operating-system-version '7.9' --shape $vmshape --query 'data[0].id' --raw-output)
-#export imageocid="ocid1.image.oc1.eu-amsterdam-1.aaaaaaaazfzdd7xsbfnojjdnwul4zm4hwzb2ulja3ln6o7bglf4n6nfb3dma"
 
 export vmname="NVA-VM-1"
 echo $ssh_public_key > sshkeyfile.pub
@@ -67,8 +66,6 @@ export ssh_auth_keys_file="./sshkeyfile.pub"
 rm -f cloudinit_nva.sh
   wget https://raw.githubusercontent.com/BaptisS/oci_hub-and-spoke_nva_drgv2/main/cloudinit_nva.sh
   chmod +rx cloudinit_nva.sh 
-
-#vm=$(oci compute instance launch --compartment-id $compocid --availability-domain $ad --display-name $vmname --image-id $imageocid --shape $vmshape --subnet-id $vcn_shared_subnet1_ocid --skip-source-dest-check true --assign-public-ip true)
 
 vm=$(oci compute instance launch \
     --compartment-id $compocid \
@@ -81,6 +78,7 @@ vm=$(oci compute instance launch \
     --assign-public-ip true \
     --user-data-file "./cloudinit_nva.sh" \
     --ssh-authorized-keys-file "${ssh_auth_keys_file}")
+
 export vmocid=$(echo $vm | jq -r .data.id)
 echo vmocid=$vmocid >> output.log
 
